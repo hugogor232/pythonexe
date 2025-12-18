@@ -22,7 +22,7 @@ jobs:
       run: pip install pyinstaller
     
     - name: Build EXE (onedir = fast startup)
-      run: pyinstaller --onedir --windowed --name "WiFi_AP_Finder" --noconfirm WiFi_AP_Finder_Unified.py
+      run: pyinstaller --onedir --windowed --name "WiFi_AP_Finder" --noconfirm final.py
     
     - name: Upload artifact
       uses: actions/upload-artifact@v4
