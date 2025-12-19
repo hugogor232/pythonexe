@@ -3,6 +3,7 @@
 """
 WiFi AP Finder - Version Unifiée pour compilation EXE
 Intègre: fromCsvToHuman + testDNA + testPrime
+Avec boutons: Copier IP Switch, Copier MAC, Ouvrir Contrôleur
 """
 
 import tkinter as tk
@@ -26,6 +27,7 @@ from datetime import datetime
 from urllib.parse import urlparse
 import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import webbrowser
 
 # ================================================================================
 # CONFIGURATION GLOBALE
@@ -42,12 +44,43 @@ CONTROLLER_IP_TO_NAME = {
     "10.250.255.37": "PST-CW-WLC07",
     "10.250.255.38": "PST-CW-WLC08",
     "10.250.255.39": "PST-CW-WLC09",
-    "10.134.96.3":  "PST-CW-WLC-INT (Prime 4)",
+    "10.134.96.3":  "PST-CW-WLC-INT",
     "10.250.255.44": "PST-CW-WLC11",
     "10.250.255.45": "PST-CW-WLC12",
     "10.250.255.30": "PST-CW-WLC13",
     "10.134.96.8":  "PST-CW-WLC-INT2",
     "10.134.96.81": "PST-CW-WLCPP-8540",
+}
+
+# URLs des contrôleurs
+CONTROLLER_URLS = {
+    "WLC01": "https://cd0a0nnn53.rp-laposte.apps.ocn.infra.ftgroup/screens/frameset.html",
+    "WLC02": "https://cd0a0nn528.rp-laposte.apps.ocn.infra.ftgroup/screens/frameset.html",
+    "WLC03": "https://cd0a0np02d.rp-laposte.apps.ocn.infra.ftgroup/screens/frameset.html",
+    "WLC04": "https://cd0a0nns4e.rp-laposte.apps.ocn.infra.ftgroup/screens/frameset.html",
+    "WLC05": "https://cd0a0nnj57.rp-laposte.apps.ocn.infra.ftgroup/screens/frameset.html",
+    "WLC06": "https://cd0bsctw5e.rp-laposte.apps.ocn.infra.ftgroup/screens/frameset.html",
+    "WLC07": "https://cd0bsd822a.rp-laposte.apps.ocn.infra.ftgroup/screens/frameset.html",
+    "WLC08": "https://cd0bsd0t4c.rp-laposte.apps.ocn.infra.ftgroup/screens/frameset.html",
+    "WLC09": "https://cd0bsdat4c.rp-laposte.apps.ocn.infra.ftgroup/screens/frameset.html",
+    "WLC-INT": "https://cd0d1xpx75.rp-laposte.apps.ocn.infra.ftgroup/screens/frameset.html",
+    "WLC11": "https://cd0klgv297.rp-laposte.apps.ocn.infra.ftgroup/webui/",
+    "WLC12": "https://cd0klgt297.rp-laposte.apps.ocn.infra.ftgroup/",
+    "WLC13": "https://cd0klgqkee.rp-laposte.apps.ocn.infra.ftgroup/webui/",
+    "PST-CW-WLC01": "https://cd0a0nnn53.rp-laposte.apps.ocn.infra.ftgroup/screens/frameset.html",
+    "PST-CW-WLC02": "https://cd0a0nn528.rp-laposte.apps.ocn.infra.ftgroup/screens/frameset.html",
+    "PST-CW-WLC03": "https://cd0a0np02d.rp-laposte.apps.ocn.infra.ftgroup/screens/frameset.html",
+    "PST-CW-WLC04": "https://cd0a0nns4e.rp-laposte.apps.ocn.infra.ftgroup/screens/frameset.html",
+    "PST-CW-WLC05": "https://cd0a0nnj57.rp-laposte.apps.ocn.infra.ftgroup/screens/frameset.html",
+    "PST-CW-WLC06": "https://cd0bsctw5e.rp-laposte.apps.ocn.infra.ftgroup/screens/frameset.html",
+    "PST-CW-WLC07": "https://cd0bsd822a.rp-laposte.apps.ocn.infra.ftgroup/screens/frameset.html",
+    "PST-CW-WLC08": "https://cd0bsd0t4c.rp-laposte.apps.ocn.infra.ftgroup/screens/frameset.html",
+    "PST-CW-WLC09": "https://cd0bsdat4c.rp-laposte.apps.ocn.infra.ftgroup/screens/frameset.html",
+    "PST-CW-WLC-INT": "https://cd0d1xpx75.rp-laposte.apps.ocn.infra.ftgroup/screens/frameset.html",
+    "PST-CW-WLC-INT2": "https://cd0lzq7cfd.rp-laposte.apps.ocn.infra.ftgroup/webui/#/dashboard",
+    "PST-CW-WLC11": "https://cd0klgv297.rp-laposte.apps.ocn.infra.ftgroup/webui/",
+    "PST-CW-WLC12": "https://cd0klgt297.rp-laposte.apps.ocn.infra.ftgroup/",
+    "PST-CW-WLC13": "https://cd0klgqkee.rp-laposte.apps.ocn.infra.ftgroup/webui/",
 }
 
 # ================================================================================
@@ -67,6 +100,10 @@ COLORS = {
     "accent_gray": "#6b7280",
     "accent_gray_hover": "#4b5563",
     "accent_red": "#ef4444",
+    "accent_purple": "#8b5cf6",
+    "accent_purple_hover": "#7c3aed",
+    "accent_cyan": "#06b6d4",
+    "accent_cyan_hover": "#0891b2",
     "text_primary": "#f3f4f6",
     "text_secondary": "#9ca3af",
     "text_muted": "#6b7280",
@@ -88,7 +125,7 @@ DNA_WIRELESS_INFO_ALL_FILE = os.path.join(DNA_OUTPUT_DIR, "dna_wireless_info_all
 DNA_VERIFY_SSL = False
 DNA_USE_SYSTEM_PROXY = False
 DNA_TIMEOUT = 30
-DNA_DEBUG = False  # Réduire les logs en mode GUI
+DNA_DEBUG = False
 
 # ================================================================================
 # PRIME CONFIGURATION
@@ -187,7 +224,6 @@ def dna_fetch_all_devices_paginated(opener, base_url: str, token: str, user: str
         status, reason, ctype, hdrs, parsed, body = dna_get_json_by_url(opener, url, token)
         
         if status == 401:
-            # Token expiré, renouveler
             s, r, new_token, _ = dna_get_token(opener, base_url, user, pwd)
             if s == 200 and new_token:
                 token = new_token
@@ -245,7 +281,6 @@ def dna_fetch_wireless_info_for_devices(opener, base_url: str, token: str, user:
         with token_lock:
             tok = current_token["value"]
         
-        # Essayer endpoint intent
         url1 = base_url.rstrip("/") + DNA_ENDPOINT_WI_INTENT_TPL.format(id=dev_id)
         s1, r1, ct1, h1, j1, b1 = dna_get_json_by_url(opener, url1, tok)
         
@@ -260,7 +295,6 @@ def dna_fetch_wireless_info_for_devices(opener, base_url: str, token: str, user:
         if s1 == 200 and j1:
             return {"device": ap, "status": s1, "data": j1}
         
-        # Fallback endpoint api
         url2 = base_url.rstrip("/") + DNA_ENDPOINT_WI_API_TPL.format(id=dev_id)
         s2, r2, ct2, h2, j2, b2 = dna_get_json_by_url(opener, url2, tok)
         
@@ -283,7 +317,6 @@ def dna_fetch_wireless_info_for_devices(opener, base_url: str, token: str, user:
                     else:
                         counters["err"] += 1
                     
-                    # Callback de progression
                     if progress_callback and counters["done"] % 50 == 0:
                         progress_callback(counters["done"], total_to_process)
             except Exception:
@@ -314,21 +347,17 @@ def dna_process_single(dna_name: str, opener, user: str, pwd: str, page_size: in
     
     token = None
     try:
-        # Auth
         s, r, token, tok_body = dna_get_token(opener, base_url, user, pwd)
         if s != 200 or not token:
             result["error"] = f"Auth échouée HTTP {s} {r}"
             return result
         
-        # Devices
         devices = dna_fetch_all_devices_paginated(opener, base_url, token, user, pwd, page_size, max_pages)
         result["devices"] = {"count": len(devices)}
         
-        # Sauvegarder devices bruts
         devices_json_file = os.path.join(DNA_OUTPUT_DIR, dna_name, "devices_raw.json")
         dna_save_text(devices_json_file, json.dumps(devices, indent=2, ensure_ascii=False))
         
-        # Wireless-info
         if skip_wireless_info:
             wireless_entries, ok_count, err_count = [], 0, 0
         else:
@@ -337,7 +366,6 @@ def dna_process_single(dna_name: str, opener, user: str, pwd: str, page_size: in
             )
         result["wireless_info"] = {"count": len(wireless_entries), "entries": wireless_entries}
         
-        # Fichier de sortie
         ts = datetime.now().isoformat(timespec="seconds")
         parts = [f"# DNA API dump - {dna_name.upper()}\n# Date: {ts}\n# Base URL: {base_url}\n\n"]
         parts.append("## Network Devices\n")
@@ -355,7 +383,6 @@ def dna_process_single(dna_name: str, opener, user: str, pwd: str, page_size: in
     return result
 
 def run_dna_collection(user: str, pwd: str, workers: int = 10, progress_callback=None) -> tuple:
-    """Exécute la collecte DNA complète. Retourne (success, message)"""
     try:
         opener = dna_create_opener(DNA_VERIFY_SSL, DNA_USE_SYSTEM_PROXY)
         
@@ -367,7 +394,6 @@ def run_dna_collection(user: str, pwd: str, workers: int = 10, progress_callback
                                    workers=workers, progress_callback=progress_callback)
             results.append(r)
         
-        # Agrégat wireless-info
         ts = datetime.now().isoformat(timespec="seconds")
         parts = [f"# DNA Wireless Info (agrégé)\n# Date: {ts}\n\n"]
         total_entries = 0
@@ -385,7 +411,6 @@ def run_dna_collection(user: str, pwd: str, workers: int = 10, progress_callback
         
         dna_save_text(DNA_WIRELESS_INFO_ALL_FILE, "\n".join(parts))
         
-        # Résumé
         success_count = sum(1 for r in results if r["success"])
         total_devices = sum(r.get("devices", {}).get("count", 0) for r in results)
         
@@ -476,6 +501,7 @@ def prime_get_deep_text(parent, local_names):
     return ""
 
 def prime_iter_ap_entries(root):
+    """Extrait les AP avec leurs MAC addresses depuis Prime"""
     if root is None:
         return
     for ap in root.iter():
@@ -486,6 +512,9 @@ def prime_iter_ap_entries(root):
                 "neighborName": prime_get_deep_text(ap, ["neighborName", "cdpNeighborName", "cdpNeighborDeviceName"]),
                 "neighborPort": prime_get_deep_text(ap, ["neighborPort", "cdpNeighborPort"]),
                 "neighborIpAddress": prime_get_deep_text(ap, ["neighborIpAddress", "cdpNeighborIpAddress", "cdpNeighborAddress", "neighborAddress"]),
+                # Ajout des champs MAC
+                "ethernetMacAddress": prime_get_deep_text(ap, ["ethernetMacAddress", "ethernetMac", "macAddress", "baseMacAddress", "apEthernetMacAddress"]),
+                "ipAddress": prime_get_deep_text(ap, ["ipAddress", "managementIpAddress", "apIpAddress"]),
             }
 
 def prime_write_csv(output_dir: str, rows: list):
@@ -495,14 +524,15 @@ def prime_write_csv(output_dir: str, rows: list):
     path = os.path.join(output_dir, filename)
     with open(path, "w", encoding="utf-8", newline="") as f:
         f.write("AP Inventory\n")
-        f.write("AP Name,Neighbor Name,Neighbor Address,Neighbor Port,Controller Name\n")
+        # Header avec MAC et IP
+        f.write("AP Name,Neighbor Name,Neighbor Address,Neighbor Port,Controller Name,MAC Address,IP Address\n")
         for r in rows:
             def esc(v):
                 v = (v or "").replace("\n", " ").strip()
                 if ("," in v) or ('"' in v):
                     v = '"' + v.replace('"', '""') + '"'
                 return v
-            f.write(f"{esc(r.get('name'))},{esc(r.get('neighborName'))},{esc(r.get('neighborIpAddress'))},{esc(r.get('neighborPort'))},{esc(r.get('controllerName'))}\n")
+            f.write(f"{esc(r.get('name'))},{esc(r.get('neighborName'))},{esc(r.get('neighborIpAddress'))},{esc(r.get('neighborPort'))},{esc(r.get('controllerName'))},{esc(r.get('ethernetMacAddress'))},{esc(r.get('ipAddress'))}\n")
     return path
 
 def prime_purge_old_csvs(dir_path: str):
@@ -549,7 +579,6 @@ def prime_fetch_inventory(base_url: str, user: str, pwd: str, page_size: int = 5
     return rows
 
 def run_prime_collection(user: str, pwd: str) -> tuple:
-    """Exécute la collecte Prime complète. Retourne (success, message)"""
     try:
         written = []
         for name, cfg in PRIME_CONFIG.items():
@@ -632,6 +661,15 @@ class WiFiAPFinder:
         self.ap_data = {}
         self.switch_ip_map = {}
         
+        self.current_result = {
+            "switch_ip": "",
+            "mac": "",
+            "controller": "",
+            "ap_name": "",
+            "port": "",
+            "switch": "",
+        }
+        
         self.csv_dirs = [
             os.path.join("downloads", "prime1"),
             os.path.join("downloads", "prime2"),
@@ -659,90 +697,109 @@ class WiFiAPFinder:
     def setup_gui(self):
         self.window = tk.Tk()
         self.window.title("WiFi AP Finder")
-        self.window.geometry("900x700")
+        self.window.geometry("1100x650")
         self.window.configure(bg=COLORS["bg_dark"])
         self.window.resizable(True, True)
-        self.window.minsize(800, 600)
+        self.window.minsize(900, 500)
         self.center_window()
 
         main_container = tk.Frame(self.window, bg=COLORS["bg_dark"])
-        main_container.pack(fill="both", expand=True, padx=30, pady=25)
+        main_container.pack(fill="both", expand=True, padx=20, pady=15)
 
-        # Header
-        header_frame = tk.Frame(main_container, bg=COLORS["bg_dark"])
-        header_frame.pack(fill="x", pady=(0, 25))
-        title_frame = tk.Frame(header_frame, bg=COLORS["bg_dark"])
-        title_frame.pack(anchor="w")
-        icon_canvas = tk.Canvas(title_frame, width=40, height=40, bg=COLORS["bg_dark"], highlightthickness=0)
-        icon_canvas.pack(side="left", padx=(0, 12))
-        self.draw_wifi_icon(icon_canvas)
-        title_text_frame = tk.Frame(title_frame, bg=COLORS["bg_dark"])
-        title_text_frame.pack(side="left")
-        tk.Label(title_text_frame, text="WiFi AP Finder", font=("Segoe UI", 22, "bold"),
-                 bg=COLORS["bg_dark"], fg=COLORS["text_primary"]).pack(anchor="w")
-        tk.Label(title_text_frame, text="Prime + DNA Center", font=("Segoe UI", 10),
-                 bg=COLORS["bg_dark"], fg=COLORS["text_secondary"]).pack(anchor="w")
-
-        # Status card
-        status_card = tk.Frame(main_container, bg=COLORS["bg_medium"], padx=20, pady=15)
-        status_card.pack(fill="x", pady=(0, 20))
+        # Status card (compact)
+        status_card = tk.Frame(main_container, bg=COLORS["bg_medium"], padx=15, pady=10)
+        status_card.pack(fill="x", pady=(0, 10))
         status_header = tk.Frame(status_card, bg=COLORS["bg_medium"])
         status_header.pack(fill="x")
         self.status_icon = tk.Label(status_header, text="●", font=("Segoe UI", 10),
                                     bg=COLORS["bg_medium"], fg=COLORS["accent_green"])
         self.status_icon.pack(side="left")
-        tk.Label(status_header, text=" Sources de données", font=("Segoe UI", 11, "bold"),
+        tk.Label(status_header, text=" Sources de données", font=("Segoe UI", 10, "bold"),
                  bg=COLORS["bg_medium"], fg=COLORS["text_primary"]).pack(side="left")
         self.file_status_label = tk.Label(status_card, text="Chargement...", font=("Segoe UI", 9),
                                           bg=COLORS["bg_medium"], fg=COLORS["text_secondary"],
                                           justify="left", anchor="w")
-        self.file_status_label.pack(fill="x", pady=(8, 0))
+        self.file_status_label.pack(fill="x", pady=(5, 0))
 
         # Search card
-        search_card = tk.Frame(main_container, bg=COLORS["bg_medium"], padx=25, pady=20)
-        search_card.pack(fill="x", pady=(0, 20))
-        tk.Label(search_card, text="Nom de la borne WiFi ou Hostname", font=("Segoe UI", 11),
-                 bg=COLORS["bg_medium"], fg=COLORS["text_primary"]).pack(anchor="w", pady=(0, 10))
+        search_card = tk.Frame(main_container, bg=COLORS["bg_medium"], padx=15, pady=12)
+        search_card.pack(fill="x", pady=(0, 10))
+        
+        tk.Label(search_card, text="Nom de la borne WiFi ou Hostname", font=("Segoe UI", 10),
+                 bg=COLORS["bg_medium"], fg=COLORS["text_primary"]).pack(anchor="w", pady=(0, 8))
+        
         input_row = tk.Frame(search_card, bg=COLORS["bg_medium"])
         input_row.pack(fill="x")
         input_container = tk.Frame(input_row, bg=COLORS["border"], padx=1, pady=1)
-        input_container.pack(side="left", fill="x", expand=True, padx=(0, 15))
-        self.entry_ap = tk.Entry(input_container, font=("Segoe UI", 12), bg=COLORS["bg_input"],
+        input_container.pack(side="left", fill="x", expand=True, padx=(0, 10))
+        self.entry_ap = tk.Entry(input_container, font=("Segoe UI", 11), bg=COLORS["bg_input"],
                                  fg=COLORS["text_primary"], insertbackground=COLORS["text_primary"],
                                  relief="flat", borderwidth=0)
-        self.entry_ap.pack(fill="x", ipady=10, ipadx=12)
+        self.entry_ap.pack(fill="x", ipady=8, ipadx=10)
         self.entry_ap.bind("<Return>", lambda event: self.search_ap())
         self.entry_ap.bind("<FocusIn>", lambda e: input_container.config(bg=COLORS["border_focus"]))
         self.entry_ap.bind("<FocusOut>", lambda e: input_container.config(bg=COLORS["border"]))
 
         self.search_btn = ModernButton(input_row, text="🔍 Rechercher", command=self.search_ap,
                                        bg_color=COLORS["accent_blue"], hover_color=COLORS["accent_blue_hover"],
-                                       width=130, height=42)
+                                       width=110, height=36)
         self.search_btn.pack(side="left")
 
-        # Buttons row
+        # TOUS LES BOUTONS SUR UNE SEULE LIGNE
         buttons_row = tk.Frame(search_card, bg=COLORS["bg_medium"])
-        buttons_row.pack(fill="x", pady=(15, 0))
+        buttons_row.pack(fill="x", pady=(12, 0))
+        
+        # Boutons généraux
         self.clear_btn = ModernButton(buttons_row, text="🗑 Effacer", command=self.clear_fields,
                                       bg_color=COLORS["accent_orange"], hover_color=COLORS["accent_orange_hover"],
-                                      width=110, height=36)
-        self.clear_btn.pack(side="left", padx=(0, 10))
-        self.copy_btn = ModernButton(buttons_row, text="📋 Copier", command=self.copy_to_clipboard,
+                                      width=90, height=32)
+        self.clear_btn.pack(side="left", padx=(0, 8))
+        
+        self.copy_btn = ModernButton(buttons_row, text="📋 Tout", command=self.copy_to_clipboard,
                                      bg_color=COLORS["accent_green"], hover_color=COLORS["accent_green_hover"],
-                                     width=110, height=36)
-        self.copy_btn.pack(side="left", padx=(0, 10))
+                                     width=80, height=32)
+        self.copy_btn.pack(side="left", padx=(0, 8))
         self.copy_btn.set_state("disabled")
+        
         self.refresh_btn = ModernButton(buttons_row, text="↻ Recharger", command=self.open_reload_dialog,
                                         bg_color=COLORS["accent_gray"], hover_color=COLORS["accent_gray_hover"],
-                                        width=110, height=36)
-        self.refresh_btn.pack(side="left")
+                                        width=100, height=32)
+        self.refresh_btn.pack(side="left", padx=(0, 20))
+        
+        # Séparateur visuel
+        tk.Label(buttons_row, text="|", font=("Segoe UI", 12), bg=COLORS["bg_medium"], fg=COLORS["text_muted"]).pack(side="left", padx=(0, 20))
+        
+        # Boutons d'action rapide
+        self.copy_ip_btn = ModernButton(buttons_row, text="📋 IP Switch", command=self.copy_switch_ip,
+                                        bg_color=COLORS["accent_cyan"], hover_color=COLORS["accent_cyan_hover"],
+                                        width=95, height=32)
+        self.copy_ip_btn.pack(side="left", padx=(0, 8))
+        self.copy_ip_btn.set_state("disabled")
+        
+        self.copy_mac_btn = ModernButton(buttons_row, text="📋 MAC", command=self.copy_mac,
+                                         bg_color=COLORS["accent_purple"], hover_color=COLORS["accent_purple_hover"],
+                                         width=80, height=32)
+        self.copy_mac_btn.pack(side="left", padx=(0, 8))
+        self.copy_mac_btn.set_state("disabled")
+        
+        self.open_controller_btn = ModernButton(buttons_row, text="🌐 Contrôleur", command=self.open_controller,
+                                                bg_color=COLORS["accent_blue"], hover_color=COLORS["accent_blue_hover"],
+                                                width=105, height=32)
+        self.open_controller_btn.pack(side="left", padx=(0, 8))
+        self.open_controller_btn.set_state("disabled")
+        
+        # Label info contrôleur
+        self.controller_info_label = tk.Label(buttons_row, text="", font=("Segoe UI", 9),
+                                              bg=COLORS["bg_medium"], fg=COLORS["text_muted"])
+        self.controller_info_label.pack(side="left", padx=(5, 0))
 
         # Result card
-        result_card = tk.Frame(main_container, bg=COLORS["bg_medium"], padx=25, pady=20)
+        result_card = tk.Frame(main_container, bg=COLORS["bg_medium"], padx=15, pady=12)
         result_card.pack(fill="both", expand=True)
+        
         result_header = tk.Frame(result_card, bg=COLORS["bg_medium"])
-        result_header.pack(fill="x", pady=(0, 12))
-        tk.Label(result_header, text="Résultat", font=("Segoe UI", 11, "bold"),
+        result_header.pack(fill="x", pady=(0, 8))
+        tk.Label(result_header, text="Résultat", font=("Segoe UI", 10, "bold"),
                  bg=COLORS["bg_medium"], fg=COLORS["text_primary"]).pack(side="left")
         self.copy_status_label = tk.Label(result_header, text="", font=("Segoe UI", 9),
                                           bg=COLORS["bg_medium"], fg=COLORS["accent_green"])
@@ -752,7 +809,7 @@ class WiFiAPFinder:
         result_text_container.pack(fill="both", expand=True)
         self.result_text = tk.Text(result_text_container, font=("Consolas", 11), bg=COLORS["bg_light"],
                                    fg=COLORS["text_secondary"], insertbackground=COLORS["text_primary"],
-                                   relief="flat", borderwidth=0, wrap=tk.WORD, padx=15, pady=12, state="disabled")
+                                   relief="flat", borderwidth=0, wrap=tk.WORD, padx=12, pady=10, state="disabled")
         self.result_text.pack(fill="both", expand=True)
         self.last_result = ""
 
@@ -764,13 +821,69 @@ class WiFiAPFinder:
         y = (self.window.winfo_screenheight() // 2) - (height // 2)
         self.window.geometry(f'+{x}+{y}')
 
-    def draw_wifi_icon(self, canvas):
-        cx, cy = 20, 25
-        color = COLORS["accent_blue"]
-        canvas.create_arc(cx-18, cy-18, cx+18, cy+18, start=45, extent=90, style="arc", outline=color, width=2)
-        canvas.create_arc(cx-12, cy-12, cx+12, cy+12, start=45, extent=90, style="arc", outline=color, width=2)
-        canvas.create_arc(cx-6, cy-6, cx+6, cy+6, start=45, extent=90, style="arc", outline=color, width=2)
-        canvas.create_oval(cx-3, cy+2, cx+3, cy+8, fill=color, outline="")
+    # ==================== ACTIONS RAPIDES ====================
+    
+    def copy_switch_ip(self):
+        ip = self.current_result.get("switch_ip", "")
+        if ip:
+            self.copy_to_clipboard_text(ip)
+            self.show_copy_status(f"✓ IP: {ip}")
+        else:
+            self.show_copy_status("❌ Pas d'IP", error=True)
+    
+    def copy_mac(self):
+        mac = self.current_result.get("mac", "")
+        if mac:
+            self.copy_to_clipboard_text(mac)
+            self.show_copy_status(f"✓ MAC: {mac}")
+        else:
+            self.show_copy_status("❌ Pas de MAC", error=True)
+    
+    def open_controller(self):
+        controller = self.current_result.get("controller", "")
+        if not controller:
+            self.show_copy_status("❌ Pas de contrôleur", error=True)
+            return
+        
+        url = None
+        if controller in CONTROLLER_URLS:
+            url = CONTROLLER_URLS[controller]
+        else:
+            for key, value in CONTROLLER_URLS.items():
+                if key in controller or controller in key:
+                    url = value
+                    break
+        
+        if url and not url.startswith("https://URL_"):
+            webbrowser.open(url)
+            self.show_copy_status(f"✓ {controller}")
+        else:
+            self.show_copy_status(f"❌ URL non configurée", error=True)
+    
+    def copy_to_clipboard_text(self, text):
+        try:
+            self.window.clipboard_clear()
+            self.window.clipboard_append(text)
+            self.window.update()
+        except Exception:
+            pass
+    
+    def show_copy_status(self, message, error=False):
+        color = COLORS["accent_red"] if error else COLORS["accent_green"]
+        self.copy_status_label.config(text=message, fg=color)
+        self.window.after(3000, lambda: self.copy_status_label.config(text=""))
+    
+    def update_action_buttons(self):
+        has_ip = bool(self.current_result.get("switch_ip"))
+        has_mac = bool(self.current_result.get("mac"))
+        has_controller = bool(self.current_result.get("controller"))
+        
+        self.copy_ip_btn.set_state("normal" if has_ip else "disabled")
+        self.copy_mac_btn.set_state("normal" if has_mac else "disabled")
+        self.open_controller_btn.set_state("normal" if has_controller else "disabled")
+        
+        controller = self.current_result.get("controller", "")
+        self.controller_info_label.config(text=f"→ {controller}" if controller else "")
 
     # ==================== DATA LOADING ====================
     
@@ -792,13 +905,13 @@ class WiFiAPFinder:
             )
         else:
             self.status_icon.config(fg=COLORS["accent_green"])
-            files_list = [os.path.basename(p) for p in self.loaded_files]
             self.file_status_label.config(
-                text=f"{len(self.ap_data):,} AP • Prime: {prime_count} • DNA: {dna_rogue_count} • Wireless: {wireless_count} • Switches: {switch_count}\nFichiers: {', '.join(files_list[:5])}{'...' if len(files_list) > 5 else ''}",
+                text=f"{len(self.ap_data):,} AP • Prime: {prime_count} • DNA: {dna_rogue_count} • Wireless: {wireless_count} • Switches: {switch_count}",
                 fg=COLORS["text_secondary"],
             )
 
     def load_switch_ip_mapping(self):
+        """Charge le mapping hostname -> IP depuis Report-SW.csv"""
         if not os.path.isfile(self.report_sw_path):
             return 0
         
@@ -813,6 +926,7 @@ class WiFiAPFinder:
                 if not header:
                     return 0
                 
+                # Format: "Nom de site";"Hostname équipement";...;"Adresse IP admin" (index 1 et 8)
                 hostname_idx = 1
                 ip_idx = 8
                 
@@ -872,6 +986,7 @@ class WiFiAPFinder:
             return None
 
     def parse_ap_inventory_from_file(self, path, source_label):
+        """Parse les CSV Prime avec support du nouveau format (avec MAC et IP)"""
         rows = []
         try:
             with open(path, "r", encoding="utf-8", errors="ignore") as f:
@@ -890,20 +1005,32 @@ class WiFiAPFinder:
             i += 1
         if i >= len(lines):
             return rows
+        
+        # Lire le header pour déterminer les colonnes
+        header_line = lines[i]
+        header_parts = next(csv.reader([header_line]))
+        has_mac = len(header_parts) >= 6
+        has_ip = len(header_parts) >= 7
         i += 1
 
         while i < len(lines) and lines[i].strip():
             try:
                 row = next(csv.reader([lines[i]]))
                 if len(row) >= 5:
-                    rows.append({
+                    entry = {
                         "AP Name": row[0].strip(),
                         "Neighbor Name": row[1].strip(),
                         "Neighbor Address": row[2].strip(),
                         "Neighbor Port": row[3].strip(),
                         "Controller Name": row[4].strip(),
                         "Source": source_label,
-                    })
+                    }
+                    # MAC et IP si présents
+                    if has_mac and len(row) > 5:
+                        entry["MAC Address"] = row[5].strip()
+                    if has_ip and len(row) > 6:
+                        entry["IP Address"] = row[6].strip()
+                    rows.append(entry)
             except Exception:
                 pass
             i += 1
@@ -931,7 +1058,9 @@ class WiFiAPFinder:
                     "source": source,
                     "ap_location": "", "ap_profile": "", "rf_profile": "",
                     "site_tag": "", "policy_tag": "", "ap_group": "",
-                    "management_ip": "", "mac_address": "", "platform": "", "series": "",
+                    "management_ip": r.get("IP Address") or "",
+                    "mac_address": r.get("MAC Address") or "",
+                    "platform": "", "series": "",
                 }
                 self.merge_ap_entry(ap, new)
         return total_rows
@@ -1143,6 +1272,7 @@ class WiFiAPFinder:
             if d.get("port"): s += 2
             if d.get("controller"): s += 1
             if d.get("neighbor_ip"): s += 1
+            if d.get("mac_address"): s += 1
             if d.get("ap_location") and d.get("ap_location") != "default location": s += 1
             return s
 
@@ -1178,6 +1308,9 @@ class WiFiAPFinder:
         if not ap_name:
             messagebox.showwarning("Attention", "Veuillez entrer un nom/hostname")
             return
+
+        self.current_result = {"switch_ip": "", "mac": "", "controller": "", "ap_name": "", "port": "", "switch": ""}
+        self.update_action_buttons()
 
         if ap_name in self.ap_data:
             self.show_result_for(ap_name, self.ap_data[ap_name])
@@ -1221,14 +1354,24 @@ class WiFiAPFinder:
         platform = info.get("platform") or ""
         ap_location = info.get("ap_location") or ""
 
+        self.current_result = {
+            "switch_ip": switch_ip or neighbor_ip,
+            "mac": mac,
+            "controller": ctrl,
+            "ap_name": ap_name,
+            "port": port,
+            "switch": sw,
+        }
+        self.update_action_buttons()
+
         lines = []
         if sw and port:
             if switch_ip:
-                lines.append(f"La borne wifi {ap_name} a été détectée sur le port {port} du switch {sw} (IP {switch_ip})")
+                lines.append(f"borne : {ap_name}\nport : {port}\nswitch : {sw} (IP {switch_ip})")
             elif neighbor_ip:
-                lines.append(f"La borne wifi {ap_name} a été détectée sur le port {port} du switch {sw} (IP {neighbor_ip})")
+                lines.append(f"borne : {ap_name}\nport : {port}\nswitch : {sw} (IP {neighbor_ip})")
             else:
-                lines.append(f"La borne wifi {ap_name} a été détectée sur le port {port} du switch {sw}")
+                lines.append(f"borne : {ap_name}\nport : {port}\nswitch : {sw}")
         else:
             lines.append(f"Borne wifi: {ap_name}")
         
@@ -1256,16 +1399,16 @@ class WiFiAPFinder:
 
         self.display_result("\n".join(lines), success=True)
         
-        # Clipboard
         ip_to_show = switch_ip or neighbor_ip
         if sw and port:
             if ip_to_show:
-                clip = f"la borne wifi {ap_name} a été détectée sur le port {port} du switch {sw} (IP {ip_to_show}) sur le contrôleur {ctrl}"
+                clip = f"borne : {ap_name} \nport : {port} \nswitch : {sw} (IP {ip_to_show}) \ncontrôleur : {ctrl}"
             else:
-                clip = f"la borne wifi {ap_name} a été détectée sur le port {port} du switch {sw} sur le contrôleur {ctrl}"
+                clip = f"borne : {ap_name} \nport : {port} \nswitch : {sw} \ncontrôleur : {ctrl}"
         else:
-            clip = f"borne wifi {ap_name} sur le contrôleur {ctrl}" if ctrl else f"borne wifi {ap_name}"
-        self.copy_result_to_clipboard(clip)
+            clip = f"borne : {ap_name} \ncontrôleur : {ctrl}\n" if ctrl else f"borne : {ap_name}"
+        self.copy_to_clipboard_text(clip)
+        self.show_copy_status("✓ Copié")
 
     # ==================== DISPLAY ====================
     
@@ -1278,19 +1421,10 @@ class WiFiAPFinder:
         self.result_text.config(state="disabled")
         self.copy_btn.set_state("normal")
 
-    def copy_result_to_clipboard(self, text):
-        try:
-            self.window.clipboard_clear()
-            self.window.clipboard_append(text)
-            self.window.update()
-            self.copy_status_label.config(text="✓ Copié !", fg=COLORS["accent_green"])
-            self.window.after(3000, lambda: self.copy_status_label.config(text=""))
-        except Exception:
-            pass
-
     def copy_to_clipboard(self):
         if self.last_result:
-            self.copy_result_to_clipboard(self.last_result)
+            self.copy_to_clipboard_text(self.last_result)
+            self.show_copy_status("✓ Tout copié")
 
     def clear_fields(self):
         self.entry_ap.delete(0, tk.END)
@@ -1300,6 +1434,8 @@ class WiFiAPFinder:
         self.copy_btn.set_state("disabled")
         self.copy_status_label.config(text="")
         self.last_result = ""
+        self.current_result = {"switch_ip": "", "mac": "", "controller": "", "ap_name": "", "port": "", "switch": ""}
+        self.update_action_buttons()
 
     # ==================== RELOAD DIALOG ====================
     
@@ -1312,7 +1448,6 @@ class WiFiAPFinder:
 
         pad = {"padx": 14, "pady": 8}
 
-        # DNA
         tk.Label(dlg, text="Identifiants DNA Center", font=("Segoe UI", 11, "bold"),
                  bg=COLORS["bg_medium"], fg=COLORS["text_primary"]).grid(row=0, column=0, columnspan=2, **pad, sticky="w")
         tk.Label(dlg, text="Utilisateur:", bg=COLORS["bg_medium"], fg=COLORS["text_secondary"]).grid(row=1, column=0, **pad, sticky="e")
@@ -1323,7 +1458,6 @@ class WiFiAPFinder:
         tk.Entry(dlg, textvariable=dna_user_var, width=28, bg=COLORS["bg_input"], fg=COLORS["text_primary"], relief="flat").grid(row=1, column=1, **pad)
         tk.Entry(dlg, textvariable=dna_pwd_var, width=28, bg=COLORS["bg_input"], fg=COLORS["text_primary"], relief="flat", show="*").grid(row=2, column=1, **pad)
 
-        # Prime
         tk.Label(dlg, text="Identifiants Prime", font=("Segoe UI", 11, "bold"),
                  bg=COLORS["bg_medium"], fg=COLORS["text_primary"]).grid(row=3, column=0, columnspan=2, **pad, sticky="w")
         tk.Label(dlg, text="Utilisateur:", bg=COLORS["bg_medium"], fg=COLORS["text_secondary"]).grid(row=4, column=0, **pad, sticky="e")
@@ -1334,8 +1468,7 @@ class WiFiAPFinder:
         tk.Entry(dlg, textvariable=prime_user_var, width=28, bg=COLORS["bg_input"], fg=COLORS["text_primary"], relief="flat").grid(row=4, column=1, **pad)
         tk.Entry(dlg, textvariable=prime_pwd_var, width=28, bg=COLORS["bg_input"], fg=COLORS["text_primary"], relief="flat", show="*").grid(row=5, column=1, **pad)
 
-        # Workers
-        tk.Label(dlg, text="Workers (parallélisme):", bg=COLORS["bg_medium"], fg=COLORS["text_secondary"]).grid(row=6, column=0, **pad, sticky="e")
+        tk.Label(dlg, text="Workers:", bg=COLORS["bg_medium"], fg=COLORS["text_secondary"]).grid(row=6, column=0, **pad, sticky="e")
         workers_var = tk.StringVar(value="10")
         tk.Entry(dlg, textvariable=workers_var, width=8, bg=COLORS["bg_input"], fg=COLORS["text_primary"], relief="flat").grid(row=6, column=1, **pad, sticky="w")
 
@@ -1353,10 +1486,10 @@ class WiFiAPFinder:
 
         ModernButton(btn_frame, text="Annuler", command=dlg.destroy,
                      bg_color=COLORS["accent_gray"], hover_color=COLORS["accent_gray_hover"],
-                     width=110, height=36).pack(side="left", padx=6)
+                     width=100, height=34).pack(side="left", padx=6)
         ModernButton(btn_frame, text="Lancer", command=on_submit,
                      bg_color=COLORS["accent_blue"], hover_color=COLORS["accent_blue_hover"],
-                     width=110, height=36).pack(side="left", padx=6)
+                     width=100, height=34).pack(side="left", padx=6)
 
         self.window.update_idletasks()
         x = self.window.winfo_x() + (self.window.winfo_width() // 2) - 200
@@ -1388,7 +1521,6 @@ class WiFiAPFinder:
         def worker():
             msgs = []
             
-            # DNA
             if dna_user and dna_pwd:
                 self.window.after(0, lambda: self.file_status_label.config(text="Collecte DNA...", fg=COLORS["text_secondary"]))
                 ok, msg = run_dna_collection(dna_user, dna_pwd, workers, progress_cb)
@@ -1396,7 +1528,6 @@ class WiFiAPFinder:
             else:
                 msgs.append("DNA: Ignoré (pas de credentials)")
             
-            # Prime
             if prime_user and prime_pwd:
                 self.window.after(0, lambda: self.file_status_label.config(text="Collecte Prime...", fg=COLORS["text_secondary"]))
                 ok, msg = run_prime_collection(prime_user, prime_pwd)
