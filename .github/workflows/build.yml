@@ -8,65 +8,37 @@ on:
 jobs:
   build:
     runs-on: windows-latest
-
+    
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Upgrade pip
-        run: python -m pip install --upgrade pip
-
-      - name: Install PyInstaller
-        run: pip install pyinstaller
-
-      - name: Build EXE (optimized)
-        run: |
-          pyinstaller --onedir --windowed --name "WiFi_AP_Finder" --noconfirm \
-            --clean \
-            --exclude-module pytest \
-            --exclude-module setuptools \
-            --exclude-module pip \
-            --exclude-module numpy \
-            --exclude-module pandas \
-            --exclude-module matplotlib \
-            --exclude-module scipy \
-            --exclude-module PIL \
-            --exclude-module cv2 \
-            --exclude-module unittest \
-            final.py
-        shell: cmd
-
-      - name: Prune unused locales and assets (post-build)
-        shell: pwsh
-        run: |
-          $dist = ".\dist\WiFi_AP_Finder"
-          if (Test-Path $dist) {
-            # Supprimer les répertoires locaux non essentiels
-            $patterns = @("locales","translations","i18n")
-            foreach ($p in $patterns) {
-              Get-ChildItem -Path $dist -Directory -Recurse -Filter $p -ErrorAction SilentlyContinue | \
-                Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-            }
-            # Supprimer aussi les chemins parfois présents directement sous dist
-            Remove-Item -Path (Join-Path $dist "locales") -Recurse -Force -ErrorAction SilentlyContinue
-            Remove-Item -Path (Join-Path $dist "translations") -Recurse -Force -ErrorAction SilentlyContinue
-            Remove-Item -Path (Join-Path $dist "i18n") -Recurse -Force -ErrorAction SilentlyContinue
-
-            # Nettoyage du dossier share/locale s'il existe
-            $shareLocale = Join-Path $dist "share\locale"
-            if (Test-Path $shareLocale) {
-              Remove-Item -Path $shareLocale -Recurse -Force -ErrorAction SilentlyContinue
-            }
-          }
-
-      - name: Upload artifact
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: WiFi_AP_Finder_Windows
-          path: dist/WiFi_AP_Finder/
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install PyInstaller
+      run: pip install pyinstaller
+    
+    - name: Build EXE (optimized)
+      run: |
+        pyinstaller --onedir --windowed --name "WiFi_AP_Finder" --noconfirm ^
+          --exclude-module pytest ^
+          --exclude-module setuptools ^
+          --exclude-module pip ^
+          --exclude-module numpy ^
+          --exclude-module pandas ^
+          --exclude-module matplotlib ^
+          --exclude-module scipy ^
+          --exclude-module PIL ^
+          --exclude-module cv2 ^
+          --exclude-module unittest ^
+          final.py
+      shell: cmd
+    
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: WiFi_AP_Finder_Windows
+        path: dist/WiFi_AP_Finder/
