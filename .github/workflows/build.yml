@@ -11,25 +11,26 @@ jobs:
     runs-on: windows-latest
 
     env:
-      EXE_NAME: WiFiAPFinder
-      MAIN_SCRIPT: final.py
+      EXE_NAME: WiFiAPFinder      # nom de l'exe
+      MAIN_SCRIPT: final.py       # ton script principal
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python 3.14
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.14'
+          cache: 'pip'
 
-      - name: Install PyInstaller only
+      - name: Install PyInstaller (compatible 3.14)
         shell: bash
         run: |
           python -m pip install --upgrade pip
-          pip install pyinstaller
+          pip install "pyinstaller>=6.13.0"
 
-      - name: Build EXE
+      - name: Build EXE (onedir, fast startup)
         shell: bash
         run: |
           pyinstaller \
@@ -38,7 +39,6 @@ jobs:
             --name "$EXE_NAME" \
             --clean \
             --windowed \
-            --strip \
             "$MAIN_SCRIPT"
 
       - name: Upload artifact
