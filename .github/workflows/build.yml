@@ -9,7 +9,7 @@ jobs:
 
     env:
       EXE_NAME: WiFiAPFinder      # nom de l'exe
-      MAIN_SCRIPT: final.py       # ton script principal
+      MAIN_SCRIPT: final.py      # ton script principal
 
     steps:
       - name: Checkout code
