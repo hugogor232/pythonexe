@@ -22,28 +22,31 @@ jobs:
           cache: 'pip'
 
       - name: Install ONLY required packages
+        shell: bash
         run: |
           python -m pip install --upgrade pip
-          if exist requirements.txt (
-              pip install -r requirements.txt
-          )
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
           pip install pyinstaller
 
       - name: Build minimal EXE (fast startup)
+        shell: bash
         run: |
-          pyinstaller ^
-            --noconfirm ^
-            --onedir ^                 ^
-            --name %EXE_NAME% ^
-            --clean ^
-            --windowed ^
-            --strip ^                  ^
-            --exclude-module tkinter.test ^
-            --exclude-module test ^
-            %MAIN_SCRIPT%
+          pyinstaller \
+            --noconfirm \
+            --onedir \
+            --name "$EXE_NAME" \
+            --clean \
+            --windowed \
+            --strip \
+            --exclude-module tkinter.test \
+            --exclude-module test \
+            "$MAIN_SCRIPT"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: %EXE_NAME%-windows
-          path: dist/%EXE_NAME%/
+          name: ${{ env.EXE_NAME }}-windows
+          path: dist/${{ env.EXE_NAME }}/
+          if-no-files-found: error
