@@ -1,8 +1,8 @@
 name: Build Windows EXE
 
 on:
-  workflow_dispatch:        # lancement manuel depuis l'onglet Actions
-  push:                     # lancement auto à chaque push sur main
+  workflow_dispatch:
+  push:
     branches:
       - main
 
@@ -11,8 +11,8 @@ jobs:
     runs-on: windows-latest
 
     env:
-      EXE_NAME: WiFiAPFinder    # nom de l'exe final
-      MAIN_SCRIPT: final.py     # fichier Python principal
+      EXE_NAME: WiFiAPFinder
+      MAIN_SCRIPT: final.py
 
     steps:
       - name: Checkout code
@@ -22,18 +22,14 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: 'pip'
 
-      - name: Install minimal dependencies
+      - name: Install PyInstaller only
         shell: bash
         run: |
           python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then
-            pip install -r requirements.txt
-          fi
           pip install pyinstaller
 
-      - name: Build minimal EXE (fast startup)
+      - name: Build EXE
         shell: bash
         run: |
           pyinstaller \
@@ -43,8 +39,6 @@ jobs:
             --clean \
             --windowed \
             --strip \
-            --exclude-module tkinter.test \
-            --exclude-module test \
             "$MAIN_SCRIPT"
 
       - name: Upload artifact
